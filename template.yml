@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation Template: EC2 with Security Group.'
+
+Parameters:
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+    Description: AMI ID for the EC2 instance.
+  databasename:
+    Type: String
+    Description: DB name.
+  masterpassword:
+    Type: String
+    Description: Password for the DB
+    NoEcho: True
+    MinLength: 8
+    ConstraintDescription: must be at least 8 characters
+  SubnetA:
+    Type: String
+    Description: subnet1 id
+  SubnetB:
+    Type: String
+    Description:  subnet2 id
+  SubnetC:
+    Type: String
+    Description: subnet3 id
+
+Resources:
+  MySecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable SSH access via port 22, HTTP access via port 80, and port 8000'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5001
+          ToPort: 5001
+          CidrIp: 0.0.0.0/0
+  
+  EC2ServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'ec2.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'EC2ServicePolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 's3:GetObject'
+                  - 'codedeploy:CreateDeployment'
+                  - 'codedeploy:GetDeployment'
+                  - 'codedeploy:RegisterApplicationRevision'
+                Resource: '*'
+  
+  MyDBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Security group for RDS DB Instance'
+      VpcId:
+        Ref: 'AWS::NoValue' # Use the default VPC
+      SecurityGroupIngress:
+        - IpProtocol: 'tcp'
+          FromPort: '5432'
+          ToPort: '5432'
+          CidrIp: '0.0.0.0/0' # Be sure to restrict this to your IP in production
+
+  MyDBSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: 'Subnet Group for RDS'
+      SubnetIds:
+        - !Ref SubnetA
+        - !Ref SubnetB
+        - !Ref SubnetC
+  
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: EC2ServiceRole
+
+  MyEC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      InstanceType: t2.small
+      SecurityGroups:
+        - !Ref MySecurityGroup
+      ImageId: !Ref LatestAmiId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum install -y ruby
+          yum install -y aws-cli
+          cd /home/ec2-user
+          aws s3 cp s3://aws-codedeploy-${AWS::Region}/latest/install . --region ${AWS::Region}
+          chmod +x ./install
+          ./install auto
+      Tags:
+        - Key: dgroup
+          Value: project2
+        - Key: Name
+          Value: car_rental
+  
+  MyDBInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      DBName: !Ref databasename
+      AllocatedStorage: '20' # Minimum storage for PostgreSQL is 20 GiB
+      DBInstanceClass: 'db.t3.micro'
+      Engine: 'postgres'
+      EngineVersion: '13.14'
+      MasterUsername: 'postgres'
+      MasterUserPassword: !Ref masterpassword
+      DBSubnetGroupName:
+        Ref: MyDBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt MyDBSecurityGroup.GroupId
+      MultiAZ: false
+      PubliclyAccessible: true
+      StorageType: 'gp2'
+
+Outputs:
+  InstanceId:
+    Description: The Instance ID of the newly created EC2 instance.
+    Value: !Ref MyEC2Instance
+  SecurityGroupId:
+    Description: The ID of the Security Group.
+    Value: !Ref MySecurityGroup

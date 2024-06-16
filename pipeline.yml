@@ -1,0 +1,376 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CI/CD Pipeline with GitHub integration: Creates necessary roles and resources for CodeBuild, CodeDeploy, CodePipeline, and CodeCommit. Triggers pipeline on GitHub commit.'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: 'GitHub Configuration'
+        Parameters:
+          - GitHubRepo
+          - GitHubBranch
+          - GitHubOwner
+          - GitHubSecret
+      - Label:
+          default: 'AWS Configuration'
+        Parameters:
+          - CodeCommitRepoName
+
+    ParameterLabels:
+      GitHubRepo:
+        default: 'GitHub Repository Name'
+      GitHubBranch:
+        default: 'GitHub Branch'
+      GitHubOwner:
+        default: 'GitHub Owner'
+      GitHubSecret:
+        default: 'GitHub Secret for Webhook'
+      CodeCommitRepoName:
+        default: 'CodeCommit Repository Name'
+      Codedeployappname:
+        default: 'Codedeploy Repository Name'
+
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Description: 'Name of the GitHub repository to integrate with.'
+  GitHubBranch:
+    Type: String
+    Default: 'main'
+    Description: 'Branch of the GitHub repository to use.'
+  GitHubOwner:
+    Type: String
+    Description: 'Owner of the GitHub repository.'
+  GitHubSecret:
+    Type: String
+    NoEcho: true
+    Description: 'Secret token for the GitHub repository webhook.'
+  CodeCommitRepoName:
+    Type: String
+    Description: 'Name for the AWS CodeCommit repository.'
+  GitHubPAT:
+    Type: String
+    Description: 'Personal Access Token Github'
+  ActifactBucketName:
+    Type: String
+    Description: 'Actifact s3 bucket name'
+  Codedeployappname:
+    Type: String
+    Description: 'Code deploy application name'
+  CodeBuildProjectName:
+    Type: String
+    Description: 'Code build project name'
+  PipelineName:
+    Type: String
+    Description: 'Code pipeline project name'
+
+Resources:
+  S3ArtifactBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref ActifactBucketName
+  
+  CodeBuildServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'codebuild.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'CodeBuildAccess'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - s3:Put*
+                  - s3:Get*
+                  - s3:List*
+                  - logs:*
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:DescribeStacks
+                  - codecommit:*
+                  - cloudfront:CreateInvalidation
+                  - ssm:PutParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                  - secretsmanager:GetSecretValue
+                  - ecs:UpdateService
+                  - ecr:GetAuthorizationToken
+                  - kms:Decrypt
+                  #allow this role to put files into encrypted S3
+                  - kms:Encrypt
+                  - kms:List
+                  - kms:GenerateDataKey
+                Resource: '*'
+
+  CodeDeployServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'codedeploy.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'CodeDeployAccess'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 's3:Get*'
+                  - 's3:List*'
+                  - 'lambda:InvokeFunction'
+                  - 'cloudwatch:PutMetricData'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                  - 'ec2:GetConsoleOutput'
+                  - ssm:*
+                Resource: '*'
+
+  CodePipelineServiceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'codepipeline.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'CodePipelineAccess'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - codedeploy:*
+                  - s3:*
+                  - iam:PassRole
+                  - codebuild:*
+                  - codecommit:*
+                  - cloudformation:*
+                  - kms:Decrypt
+                Resource: '*'
+
+  CloudFormationExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'cloudformation.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: 'CloudFormationAccess'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - sqs:*
+                  - s3:*
+                  - logs:*
+                  - cloudfront:*
+                  - cloudwatch:*
+                  - cognito-identity:*
+                  - cognito-idp:*
+                  - dynamodb:*
+                  - events:*
+                  - iam:*
+                  - kinesis:*
+                  - lambda:*
+                  - elasticloadbalancing:*
+                  - elasticloadbalancingv2:*
+                  - sns:*
+                  - tag:*
+                  - kms:*
+                  - ec2:*
+                  - iot:*
+                  - xray:*
+                  - dax:*
+                  - application-autoscaling:*
+                  - datapipeline:*
+                  - apigateway:*
+                  - codepipeline:*
+                  - codecommit:*
+                  - codedeploy:*
+                  - elasticbeanstalk:*
+                  - opsworks:*
+                  - cloudformation:*
+                  - es:*
+                  - autoscaling:*
+                  - ecr:*
+                  - ecs:*
+                  - route53:*
+                  - rds:*
+                  - secretsmanager:*
+                  - ssm:*
+                  - elasticache:*
+                  - states:*
+                  - glue:*
+                  - cloudtrail:*
+                  - athena:*
+                  - redshift:*
+                  - sagemaker:*
+                  - dms:*
+                Resource: '*'
+
+  CodeCommitRepository:
+    Type: 'AWS::CodeCommit::Repository'
+    Properties:
+      RepositoryName: !Ref CodeCommitRepoName
+
+  CodeBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name: !Ref CodeBuildProjectName
+      Description: 'A sample project that builds code from a GitHub repository.'
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        EnvironmentVariables: []
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+
+  
+  CodeDeployApplication:
+    Type: 'AWS::CodeDeploy::Application'
+    Properties:
+      ApplicationName: !Ref Codedeployappname
+      ComputePlatform: 'Server' # or 'Lambda' or 'ECS' depending on your deployment needs
+
+
+  CodeDeployDeploymentGroup:
+    Type: 'AWS::CodeDeploy::DeploymentGroup'
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: 'MySampleDeploymentGroup'
+      DeploymentConfigName: 'CodeDeployDefault.OneAtATime'
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      Ec2TagFilters:
+        - Key: 'dgroup'
+          Value: 'project2'
+          Type: 'KEY_AND_VALUE'
+      # Optional: Include trigger configurations, alarm configurations, etc.
+      # TriggerConfigurations:
+      #   - TriggerName: 'DeploymentSuccess'
+      #     TriggerTargetArn: !Ref MySNSTopicArn
+      #     TriggerEvents:
+      #       - 'DeploymentSuccess'
+
+
+  CodePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: 'S3'
+        Location: !Ref S3ArtifactBucket # Ensure this S3 bucket is defined elsewhere in your template
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHub_Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubPAT
+              RunOrder: 1
+
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              RunOrder: 1
+
+        - Name: Deploy-CloudFormation
+          Actions:
+            - Name: DeployCFN
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              InputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub "${AWS::StackName}-deployment"
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                TemplatePath: BuildOutput::template.yml
+                TemplateConfiguration: BuildOutput::templateparameters.json
+                RoleArn: !GetAtt CloudFormationExecutionRole.Arn
+              RunOrder: 1
+
+        - Name: Deploy-Application
+          Actions:
+            - Name: DeployApplication
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CodeDeploy
+              InputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+              RunOrder: 1
+
+
+  PipelineWebhook:
+    Type: 'AWS::CodePipeline::Webhook'
+    Properties:
+      Authentication: 'GITHUB_HMAC'
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubSecret
+      Filters:
+        - JsonPath: '$.ref'
+          MatchEquals: 'refs/heads/main'
+      TargetPipeline: !Ref CodePipeline
+      TargetAction: GitHub_Source
+      Name: !Sub '${AWS::StackName}-PipelineWebhook'
+      TargetPipelineVersion: !GetAtt
+        - CodePipeline
+        - Version
+      RegisterWithThirdParty: true

@@ -1,0 +1,9 @@
+{
+    "Parameters": {
+        "databasename":"car_rental",
+        "masterpassword":"postgres",
+        "SubnetA":"subnet-074a66eaf688ac441",
+        "SubnetB":"subnet-0e640a3884b844953",
+        "SubnetC":"subnet-0703ecb7c8196a55f"
+    }
+}

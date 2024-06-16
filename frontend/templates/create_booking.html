@@ -1,0 +1,133 @@
+<!-- create_booking.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Booking</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        label {
+            margin-top: 10px;
+            display: block;
+            font-weight: bold;
+        }
+
+        input[type="date"],
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 6px;
+            margin-bottom: 16px;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        input[type="radio"] {
+            margin-right: 5px;
+        }
+
+        .radio-label {
+            display: inline-block;
+            margin-right: 15px;
+        }
+
+        button {
+            width: 100%;
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Create Booking</h2>
+        <form method="post" action="/create-booking">
+            <!-- Booking Date -->
+            <label for="booking_date">Booking Date:</label>
+            <input type="date" name="booking_date" required>
+
+            <!-- Pick Up Date -->
+            <label for="pick_up_date">Pick Up Date:</label>
+            <input type="date" name="pick_up_date" required>
+
+            <!-- Return Date -->
+            <label for="return_date">Return Date:</label>
+            <input type="date" name="return_date" required>
+
+            <!-- Customer ID -->
+            <label for="customer_id">Customer ID:</label>
+            <input type="number" name="customer_id" required>
+
+            <!-- Pick Up Location -->
+            <label for="pick_up_location">Pick Up Location:</label>
+            <input type="number" name="pick_up_location" required>
+
+            <!-- Return Location -->
+            <label for="return_location">Return Location:</label>
+            <input type="number" name="return_location" required>
+
+            <!-- Employee ID -->
+            <label for="emp_id">Employee ID:</label>
+            <input type="number" name="emp_id" required>
+
+            <!-- Chauffeur ID -->
+            <label for="chauffeur_id">Chauffeur ID:</label>
+            <input type="number" name="chauffeur_id">
+
+            <!-- Insurance Category -->
+            <label>Insurance Category:</label>
+            <div class="radio-label">
+                <input type="radio" name="insurance_category" value="category_1" required>Category 1
+            </div>
+            <div class="radio-label">
+                <input type="radio" name="insurance_category" value="category_2" required>Category 2
+            </div>
+            <div class="radio-label">
+                <input type="radio" name="insurance_category" value="category_3" required>Category 3
+            </div>
+
+            <!-- Car Registration Number -->
+            <label for="car_reg_no">Car Registration Number:</label>
+            <input type="text" name="car_reg_no" required>
+
+            <!-- Submit Button -->
+            <button type="submit">Submit Booking</button>
+        </form>
+    </div>
+</body>
+
+</html>

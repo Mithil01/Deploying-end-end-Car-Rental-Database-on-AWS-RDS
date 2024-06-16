@@ -1,0 +1,10 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /home/ec2-user
+hooks:
+  BeforeInstall:
+    - location: deploy_sripts/deploy.sh
+      timeout: 300
+      runas: ec2-user
